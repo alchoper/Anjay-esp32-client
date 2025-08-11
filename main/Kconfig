@@ -30,7 +30,7 @@ menu "anjay-esp32-client"
         endif
 
         config ANJAY_CLIENT_BOARD_UNKNOWN
-            bool "Unknown board - please configure manually"
+            bool "ESP32-DevKitC and derivatives"
     endchoice
 
     menu "Board options"
@@ -41,14 +41,14 @@ menu "anjay-esp32-client"
             default "Espressif" if ANJAY_CLIENT_BOARD_ESP_WROVER_KIT
             default "Espressif" if ANJAY_CLIENT_BOARD_ESP32_DEVKITC
             default "M5Stack" if ANJAY_CLIENT_BOARD_M5STICKC_PLUS
-            default "Unknown"
+            default "Espressif"
 
         config ANJAY_CLIENT_MODEL_NUMBER
             string "Model number"
             default "ESP-WROVER-KIT" if ANJAY_CLIENT_BOARD_ESP_WROVER_KIT
             default "ESP32-DevKitC" if ANJAY_CLIENT_BOARD_ESP32_DEVKITC
             default "M5StickC-Plus" if ANJAY_CLIENT_BOARD_M5STICKC_PLUS
-            default "Unknown"
+            default "ESP32-DevKitC"
 
         config ANJAY_CLIENT_PUSH_BUTTON
             bool "Push button enabled"
@@ -84,11 +84,6 @@ menu "anjay-esp32-client"
 
         config ANJAY_CLIENT_TEMPERATURE_SENSOR_AVAILABLE
             bool "Temperature sensor available"
-            default y if ANJAY_CLIENT_BOARD_M5STICKC_PLUS
-            default n
-
-        config ANJAY_CLIENT_LCD
-            bool "LCD is mounted on board"
             default y if ANJAY_CLIENT_BOARD_M5STICKC_PLUS
             default n
 
@@ -145,14 +140,14 @@ menu "anjay-esp32-client"
         config ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
             bool "Onboard WiFi"
 
-        config ANJAY_CLIENT_INTERFACE_BG96_MODULE
-            bool "External BG96 module"
-            select ANJAY_ESP_IDF_WITH_BG96_SUPPORT
+        config ANJAY_CLIENT_INTERFACE_CELLULAR
+            bool "Cellular module"
+            select ANJAY_ESP_IDF_WITH_CELLULAR_SUPPORT
     endchoice
 
     config ANJAY_CLIENT_CELLULAR_EVENT_LOOP
         bool
-        default y if ANJAY_CLIENT_INTERFACE_BG96_MODULE
+        default y if ANJAY_CLIENT_INTERFACE_CELLULAR
         default n
 
     menu "Client options"
@@ -206,11 +201,11 @@ menu "anjay-esp32-client"
         menu "Connection configuration"
             config ANJAY_WIFI_SSID
                 string "WiFi SSID"
-                default "myssid"
+                default "Smartenit-Devices"
 
             config ANJAY_WIFI_PASSWORD
                 string "WiFi Password"
-                default "mypassword"
+                default "CMA$405_Sec1"
 
             config ANJAY_WIFI_CONNECT_IPV6
                 bool "Obtain IPv6 address"

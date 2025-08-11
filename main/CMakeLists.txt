@@ -21,9 +21,6 @@ set(sources
      "objects/push_button.c"
      "objects/mpu6886.c"
      "objects/sensors.c"
-     "st7789.c"
-     "fontx.c"
-     "lcd.c"
      "axp192.c"
      "i2c_wrapper.c"
      "firmware_update.c")

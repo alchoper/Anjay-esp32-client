@@ -40,7 +40,6 @@
 #include "connect.h"
 #include "default_config.h"
 #include "firmware_update.h"
-#include "lcd.h"
 #include "main.h"
 #include "objects/objects.h"
 #include "sdkconfig.h"
@@ -232,26 +231,10 @@ static void update_objects_job(avs_sched_t *sched, const void *anjay_ptr) {
                       &update_objects_job, &anjay, sizeof(anjay));
 }
 
-#ifdef CONFIG_ANJAY_CLIENT_LCD
-static void check_and_write_connection_status(anjay_t *anjay) {
-    if (anjay_get_socket_entries(anjay) == NULL) {
-        lcd_write_connection_status(LCD_CONNECTION_STATUS_DISCONNECTED);
-    } else if (anjay_all_connections_failed(anjay)) {
-        lcd_write_connection_status(LCD_CONNECTION_STATUS_CONNECTION_ERROR);
-    } else if (anjay_ongoing_registration_exists(anjay)) {
-        lcd_write_connection_status(LCD_CONNECTION_STATUS_CONNECTING);
-    } else {
-        lcd_write_connection_status(LCD_CONNECTION_STATUS_CONNECTED);
-    }
-}
-#endif // CONFIG_ANJAY_CLIENT_LCD
 
 static void update_connection_status_job(avs_sched_t *sched,
                                          const void *anjay_ptr) {
     anjay_t *anjay = *(anjay_t *const *) anjay_ptr;
-#ifdef CONFIG_ANJAY_CLIENT_LCD
-    check_and_write_connection_status(anjay);
-#endif // CONFIG_ANJAY_CLIENT_LCD
 
     static bool connected_prev = true;
     bool err;
@@ -288,79 +271,7 @@ static void update_connection_status_job(avs_sched_t *sched,
                       update_connection_status_job, &anjay, sizeof(anjay));
 }
 
-static void anjay_init(void) {
-    const anjay_configuration_t CONFIG = {
-        .endpoint_name = ENDPOINT_NAME,
-        .in_buffer_size = 4000,
-        .out_buffer_size = 4000,
-        .msg_cache_size = 4000
-    };
-
-    // Read necessary data for object install
-    read_anjay_config();
-
-    anjay = anjay_new(&CONFIG);
-    if (!anjay) {
-        avs_log(tutorial, ERROR, "Could not create Anjay object");
-        return;
-    }
-
-    // Install Attribute storage and setup necessary objects
-    if (setup_security_object(anjay) || setup_server_object(anjay)
-            || fw_update_install(anjay)) {
-        avs_log(tutorial, ERROR, "Failed to install core objects");
-        return;
-    }
-
-    if (!(DEVICE_OBJ = device_object_create())
-            || anjay_register_object(anjay, DEVICE_OBJ)) {
-        avs_log(tutorial, ERROR, "Could not register Device object");
-        return;
-    }
-
-    if ((LIGHT_CONTROL_OBJ = light_control_object_create())) {
-        anjay_register_object(anjay, LIGHT_CONTROL_OBJ);
-    }
-
-    if ((PUSH_BUTTON_OBJ = push_button_object_create())) {
-        anjay_register_object(anjay, PUSH_BUTTON_OBJ);
-    }
-
-#ifdef CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
-    if ((WLAN_OBJ = wlan_object_create())) {
-        anjay_register_object(anjay, WLAN_OBJ);
-    }
-#endif // CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
-}
-
-static void anjay_task(void *pvParameters) {
-    sensors_install(anjay);
-
-    update_connection_status_job(anjay_get_scheduler(anjay), &anjay);
-    update_objects_job(anjay_get_scheduler(anjay), &anjay);
-
-#if defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP) \
-        && !defined(CONFIG_ANJAY_WITH_EVENT_LOOP)
-    cellular_event_loop_run(anjay);
-#elif defined(CONFIG_ANJAY_WITH_EVENT_LOOP) \
-        && !defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP)
-    anjay_event_loop_run(anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
-#else
-#    error "Exactly one Event Loop configuration should be enabled at a time: ANJAY_CLIENT_CELLULAR_EVENT_LOOP or ANJAY_WITH_EVENT_LOOP."
-#endif // defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP) &&
-       // !defined(CONFIG_ANJAY_WITH_EVENT_LOOP)
-    avs_sched_del(&sensors_job_handle);
-    avs_sched_del(&connection_status_job_handle);
-    anjay_delete(anjay);
-    sensors_release();
-
-    if (fw_update_requested()) {
-        fw_update_reboot();
-    }
-}
-
-static void
-log_handler(avs_log_level_t level, const char *module, const char *msg) {
+static void log_handler(avs_log_level_t level, const char *module, const char *msg) {
     esp_log_level_t esp_level = ESP_LOG_NONE;
     switch (level) {
     case AVS_LOG_QUIET:
@@ -543,6 +454,78 @@ static void set_wifi_config(wifi_config_t *wifi_config) {
 }
 #endif // CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
 
+static void anjay_init(void) {
+    const anjay_configuration_t CONFIG = {
+        .endpoint_name = ENDPOINT_NAME,
+        .in_buffer_size = 4000,
+        .out_buffer_size = 4000,
+        .msg_cache_size = 4000
+    };
+
+    // Read necessary data for object install
+    read_anjay_config();
+
+    anjay = anjay_new(&CONFIG);
+    if (!anjay) {
+        avs_log(tutorial, ERROR, "Could not create Anjay object");
+        return;
+    }
+
+    // Install Attribute storage and setup necessary objects
+    if (setup_security_object(anjay) || setup_server_object(anjay)
+            || fw_update_install(anjay)) {
+        avs_log(tutorial, ERROR, "Failed to install core objects");
+        return;
+    }
+
+    if (!(DEVICE_OBJ = device_object_create())
+            || anjay_register_object(anjay, DEVICE_OBJ)) {
+        avs_log(tutorial, ERROR, "Could not register Device object");
+        return;
+    }
+
+    if ((LIGHT_CONTROL_OBJ = light_control_object_create())) {
+        anjay_register_object(anjay, LIGHT_CONTROL_OBJ);
+    }
+
+    if ((PUSH_BUTTON_OBJ = push_button_object_create())) {
+        anjay_register_object(anjay, PUSH_BUTTON_OBJ);
+    }
+
+#ifdef CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
+    if ((WLAN_OBJ = wlan_object_create())) {
+        anjay_register_object(anjay, WLAN_OBJ);
+    }
+#endif // CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI
+}
+
+static void anjay_task(void *pvParameters) {
+    sensors_install(anjay);
+
+    update_connection_status_job(anjay_get_scheduler(anjay), &anjay);
+    update_objects_job(anjay_get_scheduler(anjay), &anjay);
+
+#if defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP) \
+        && !defined(CONFIG_ANJAY_WITH_EVENT_LOOP)
+    cellular_event_loop_run(anjay);
+#elif defined(CONFIG_ANJAY_WITH_EVENT_LOOP) \
+        && !defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP)
+    anjay_event_loop_run(anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
+#else
+#    error "Exactly one Event Loop configuration should be enabled at a time: ANJAY_CLIENT_CELLULAR_EVENT_LOOP or ANJAY_WITH_EVENT_LOOP."
+#endif // defined(CONFIG_ANJAY_CLIENT_CELLULAR_EVENT_LOOP) &&
+       // !defined(CONFIG_ANJAY_WITH_EVENT_LOOP)
+    avs_sched_del(&sensors_job_handle);
+    avs_sched_del(&connection_status_job_handle);
+    anjay_delete(anjay);
+    sensors_release();
+
+    if (fw_update_requested()) {
+        fw_update_reboot();
+    }
+	vTaskDelay(1000);
+}
+
 void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
@@ -550,16 +533,8 @@ void app_main(void) {
     avs_log_set_handler(log_handler);
 
     avs_log_set_default_level(AVS_LOG_TRACE);
-    anjay_init();
 
-#ifdef CONFIG_ANJAY_CLIENT_LCD
-    lcd_init();
-#    if defined(CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE)
-    lcd_write_connection_status(LCD_CONNECTION_STATUS_BG96_SETTING);
-#    elif defined(CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI)
-    lcd_write_connection_status(LCD_CONNECTION_STATUS_WIFI_CONNECTING);
-#    endif // CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE
-#endif     // CONFIG_ANJAY_CLIENT_LCD
+    anjay_init();
 
 #if defined(CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE)
     while (!setupCellular()) {
@@ -589,14 +564,10 @@ void app_main(void) {
         wlan_object_set_writable_iface_failed(anjay, WLAN_OBJ, true);
     }
 #endif // CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE
-
-#ifdef CONFIG_ANJAY_CLIENT_LCD
-#    if defined(CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE)
-    lcd_write_connection_status(LCD_CONNECTION_STATUS_BG96_SET);
-#    elif defined(CONFIG_ANJAY_CLIENT_INTERFACE_ONBOARD_WIFI)
-    lcd_write_connection_status(LCD_CONNECTION_STATUS_WIFI_CONNECTED);
-#    endif // CONFIG_ANJAY_CLIENT_INTERFACE_BG96_MODULE
-#endif     // CONFIG_ANJAY_CLIENT_LCD
-
+    
     xTaskCreate(&anjay_task, "anjay_task", 16384, NULL, 5, NULL);
+	while(1) {
+		vTaskDelay(2000);
+	}
+
 }

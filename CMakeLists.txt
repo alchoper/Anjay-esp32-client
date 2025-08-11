@@ -20,10 +20,10 @@ cmake_minimum_required(VERSION 3.6)
 
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(anjay-esp32-client)
+project(kibo-lwm2m)
 
 if(CONFIG_PARTITION_TABLE_CUSTOM)
     if(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions.csv")
-        spiffs_create_partition_image(storage graphics FLASH_IN_PROJECT)
+        spiffs_create_partition_image(storage FLASH_IN_PROJECT)
     endif()
 endif()
